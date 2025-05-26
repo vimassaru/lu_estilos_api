@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine # Use a specific version of PostgreSQL
+    container_name: lu_estilo_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-lu_estilo_db}
+    ports:
+      - "5432:5432" # Expose port only if needed for external access, otherwise keep internal
+    healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-lu_estilo_db}"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lu_estilo_api
+    depends_on:
+      db:
+        condition: service_healthy # Wait for db to be ready
+    ports:
+      - "8008:8008"
+    volumes:
+      - .:/app # Mount current directory to /app for development hot-reloading
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lu_estilo_db}
+      SECRET_KEY: ${SECRET_KEY:-09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7} # Use environment variable or default
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      # Add other environment variables your app needs
+    # The command will be handled by an entrypoint script later to run migrations
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 8008 --reload
+
+volumes:
+  postgres_data:
+
